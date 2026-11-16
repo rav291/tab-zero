@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 16/32 px version: no text lines, a thicker ring, so it stays crisp in the toolbar. -->
+  <rect x="0" y="0" width="128" height="128" rx="30" fill="#2a151c"/>
+  <rect x="34" y="16" width="60" height="96" rx="30" fill="none" stroke="#f2b544" stroke-width="20"/>
+</svg>
