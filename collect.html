@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tab Zero</title>
+  <link rel="icon" href="icons/32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Big+Shoulders+Display:wght@600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="collect.css" />
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="count-block">
+        <h1 class="brand">Tab Zero</h1>
+        <output id="count" class="count" aria-live="polite">0</output>
+        <p id="count-label" class="count-label">Looking for YouTube tabs</p>
+      </div>
+      <div class="actions">
+        <button id="go" class="btn btn-go" type="button" disabled>Collect</button>
+        <button id="stop" class="btn btn-stop" type="button" hidden>Stop</button>
+        <button id="split" class="btn btn-quiet" type="button" hidden>Also save as separate files</button>
+      </div>
+      <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+      <p id="summary" class="summary">Uncheck a video to leave it out. Asleep tabs are woken one at a time, read, and put back to sleep.</p>
+    </header>
+
+    <section class="list" aria-label="YouTube tabs">
+      <label class="all">
+        <input id="all" type="checkbox" checked />
+        <span id="all-label">Select all</span>
+      </label>
+      <ol id="list"></ol>
+    </section>
+
+    <details class="history">
+      <summary id="history-title">Read in the last 30 days</summary>
+      <div class="history-body">
+        <p>A video in this list is not read again for 30 days. Its row starts unchecked; check it to take its transcript from here.</p>
+        <div class="history-actions">
+          <button id="history-save" class="btn btn-quiet" type="button">Save all as one file</button>
+          <button id="history-clear" class="btn btn-quiet" type="button">Clear history</button>
+        </div>
+        <ol id="history-list"></ol>
+      </div>
+    </details>
+
+    <details class="log">
+      <summary>Log</summary>
+      <pre id="log"></pre>
+    </details>
+  </main>
+  <script type="module" src="collect.js"></script>
+</body>
+</html>
