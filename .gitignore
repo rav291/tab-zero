@@ -1,0 +1,3 @@
+# Sweep output is user data and never belongs in the repo
+transcripts/
+*.log
