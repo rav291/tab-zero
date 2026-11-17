@@ -27,8 +27,8 @@ watches them.
 | Phase | Scope | Status |
 |---|---|---|
 | 0. Collect | Read the transcripts of the open YouTube tabs into Markdown files. | Done (0.3.0) |
-| 1. Clean | Remove filler words and duplicate lines. Cut sponsor, intro and outro segments with SponsorBlock. Show the minutes that the cleanup removed. | Planned |
-| 2. Judge | A local helper (Chrome Native Messaging) gives an AI verdict for each video. The verdict compares the video with a profile that the user writes (interests and goals). | Planned |
+| 1. Clean | Remove filler sounds, repeated words and caption tags with a word list and regular expressions. Cut sponsor, self-promotion, interaction, intro and outro segments with SponsorBlock. Show the time that the cleanup removed and the reading time. Use no AI model. | In progress (0.4.0) |
+| 2. Judge | A Node CLI in the same repo reads the sweep files and gives a verdict for each video. Rules decide first (for example, a list of channels). An AI model decides only the videos that the rules cannot decide. The verdict compares the video with a profile that the user writes (interests and goals). | Planned |
 | 3. Prove | The user labels 30 videos. A script compares the AI verdicts with the labels and gives an agreement score. | Planned |
 | 4. Novelty | The tool tells the user when the history already contains the same ideas. | Planned |
 
@@ -43,7 +43,7 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | FR-02 | When two tabs show the same video, the list shows one row. | Done |
 | FR-03 | The extension reads the transcript from the "Show transcript" panel in the real tab (the DOM). | Done |
 | FR-04 | For an asleep tab, the extension reloads the tab, pauses the video, reads the panel and discards the tab again. It does one tab at a time. | Done |
-| FR-05 | If a hidden tab gives no transcript, the extension shows the tab for a short time and tries again. Then it goes back to its own page. | Done (see open question 5) |
+| FR-05 | The extension does not show a tab during a sweep. If a hidden tab did not render the transcript, the extension tells the user after the sweep. The user can then click one button to try these videos again, with each tab shown for a short time. Videos that have no captions are not tried again. | Planned (0.4.0) |
 | FR-06 | Each sweep saves one Markdown file with all transcripts. This gives one download, not one download for each video. | Done |
 | FR-07 | After a sweep, the user can also save one file for each video, plus an index file. | Done |
 | FR-08 | Files go to `Downloads\Tab Zero\<YYYY-MM>\<YYYY-MM-DD HH-mm>.md`. The README tells how to send them to a different folder with a directory junction. | Done |
@@ -56,13 +56,20 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | FR-15 | Each AI recommendation shows a quote from the transcript, with its timestamp. | Planned (phase 2) |
 | FR-16 | The AI verdict has four values: skip, read the summary, watch all, watch only these minutes. | Planned (phase 2) |
 | FR-17 | The AI step identifies videos that need the screen (code, diagrams, demos). For these videos, the verdict is "watch". | Planned (phase 2) |
-| FR-18 | The cleanup cuts sponsor, intro and outro segments with the time ranges from SponsorBlock. | Planned (phase 1) |
+| FR-18 | The cleanup cuts the SponsorBlock segments of the categories `sponsor`, `selfpromo`, `interaction`, `intro` and `outro`. It does not cut `preview` or `filler`, because these can contain real content. | Planned (0.4.0) |
+| FR-19 | The cleanup removes filled pauses ("um", "uh", "hmm" and their long forms, such as "ummm") and caption tags (for example "[Music]"). It does not remove discourse markers such as "like", "you know" or "I mean", because they can carry meaning. | Planned (0.4.0) |
+| FR-20 | The cleanup removes a word that the speaker says two times in a row ("the the"). It keeps the words that English can correctly repeat, for example "that that" and "had had". | Planned (0.4.0) |
+| FR-21 | Each file shows the video time, the reading time and the time that SponsorBlock cut, for each video and for the sweep. The reading time uses 238 words per minute (Brysbaert, 2019). | Planned (0.4.0) |
+| FR-22 | The history keeps the raw transcript. The cleanup runs when the extension saves a file, so better rules also apply to old videos. | Planned (0.4.0) |
+| FR-23 | The user can turn off each cleanup step (filler removal, SponsorBlock). The page keeps the setting. | Planned (0.4.0) |
+| FR-24 | After a sweep, the user can close the tabs of the videos that were read. This needs two clicks. | Planned (0.4.0) |
+| FR-25 | After a sweep, the user can show the saved file in its folder. | Planned (0.4.0) |
 
 ## 6. Non-functional requirements
 
 | ID | Requirement |
 |---|---|
-| NFR-01 | **Privacy.** The extension sends no data to a server. The only requests are the requests that the YouTube page makes itself. Transcripts, logs and history stay on the computer of the user. The repo contains no user data. The tests use made-up titles and video IDs. |
+| NFR-01 | **Privacy.** The extension sends no data to a server, with one exception: SponsorBlock. To SponsorBlock, it sends only the first 4 characters of the SHA-256 hash of each video ID, never the ID. The user can turn SponsorBlock off. The page loads no remote fonts or scripts. Transcripts, logs and history stay on the computer of the user. The repo contains no user data. The tests use made-up titles and video IDs. |
 | NFR-02 | **Memory.** The extension loads one YouTube tab at a time. Many YouTube pages at the same time use too much memory. |
 | NFR-03 | **No bypass.** Do not bypass YouTube bot checks. Do not send false browser headers. Read only what the real page shows. |
 | NFR-04 | **Rendering.** Do not use `backdrop-filter` or an animated blur. They can stop the page on a weak GPU. |
@@ -70,6 +77,9 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | NFR-06 | **Tests.** `npm test` tests the pure logic. Each new logic branch must have one test. |
 | NFR-07 | **Access.** Keyboard focus must be visible. The page must obey the reduced-motion setting of the system. |
 | NFR-08 | **Logs.** Each failure must be clear from the log alone. A log line gives the tab, the step and the result. |
+| NFR-09 | **Cost.** Use lists and rules before an AI model. Phase 1 uses no AI model. A cleanup step must be one pass over the text. |
+| NFR-10 | **License.** SponsorBlock data has the license CC BY-NC-SA 4.0. Tab Zero must stay free while it uses this data. The settings and each file that contains cut segments show the SponsorBlock attribution. |
+| NFR-11 | **Interruptions.** The extension must not change the active tab or the focused window unless the user clicks a button for that action. |
 
 ## 7. Decisions
 
@@ -82,7 +92,17 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | 2026-11-14 | Name: Tab Zero. | The goal is zero open tabs. The name is short and specific. |
 | 2026-11-14 | Keep the history in `chrome.storage.local`, not `localStorage`. Keep a small index apart from the transcripts. | 30 days of transcripts can be more than 10 MB, so the extension uses `unlimitedStorage`. The page loads only the index to show the list. |
 | 2026-11-14 | Save the `.log` file with the type `application/octet-stream`. | With `text/markdown`, the browser changed `.log` to `.md`. |
-| 2026-11-15 | Keep all user data out of the repo. | Transcripts and logs show the viewing history of the user. |
+| 2026-11-15 | Keep all user data out of the repo, in a folder outside it, not only in `.gitignore`. | Transcripts and logs show the viewing history of the user. Git cannot add a file outside the repo, by a forced add, a changed `.gitignore` or a copy. |
+| 2026-11-18 | Do not show tabs during a sweep. The retry for hidden tabs is a button after the sweep. | A tab switch stopped full screen in another tab, and the sweep took the screen from the user. |
+| 2026-11-18 | Use the filler list of `transcription-cleaner` (MIT), not the package. | The extension has no build step, and the package needs `lodash`. The list is small. One regular expression cleans the text in one pass, with no AI cost. |
+| 2026-11-18 | Do not remove "like", "you know", "I mean" or "basically". | They can carry meaning. In the first test, there were 2,154 of these words, and 2,388 safe removals (tags, "um", "uh", repeated words). |
+| 2026-11-18 | Remove "duplicate lines" from phase 1. | The transcript panel gives no duplicate lines. The first test had 0. |
+| 2026-11-18 | Ask SponsorBlock with a hash prefix of 4 characters. | SponsorBlock recommends this length. It returns the segments of many videos, and the extension selects the correct ones, so SponsorBlock does not learn which videos the user watches. |
+| 2026-11-18 | Bundle the page font in the extension. | A Google Fonts request is a request to a server, which NFR-01 does not permit. |
+| 2026-11-18 | Make the page a calm tool page: a sentence that tells the state, the list, and the actions. Remove the large count. | The large count looked like a headline, not a tool. The user needs the facts (time to watch, time to read) more than a number. |
+| 2026-11-18 | Phase 2 starts as a Node CLI in this repo. Use Chrome Native Messaging only if one click becomes necessary. | A CLI needs no install steps and reads the sweep files that already exist. Native Messaging needs a host manifest and a registry key. |
+| 2026-11-18 | Keep Tab Zero a separate product. Other tools, for example a writing tool, connect through the Markdown files. Consider a merge only when both products have users and proof of value. | Tab Zero needs only a browser. A larger app with a database, an API and auth would give Tab Zero its blockers. |
+| 2026-11-18 | Packaging: now, a zip of the extension in GitHub Releases. Later, the Chrome Web Store. The CLI becomes an npm package with a `bin` entry. When the CLI arrives, the repo gets the folders `extension/`, `cli/` and `shared/`, with one version and one release. | Chrome on Windows does not install an extension file from outside the store. A shared folder stops copies of the same code. |
 
 ## 8. Requirement log
 
@@ -99,7 +119,12 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | 2026-11-14 | User feedback | Keep a separate "couldn't collect" list. | FR-14 |
 | 2026-11-14 | Maintainer | Keep the videos already read, and show the last 30 days. | FR-12, FR-13 |
 | 2026-11-15 | Maintainer | Keep user data out of the repo. | Section 7, NFR-01 |
-| 2026-11-16 | Maintainer | The retry for hidden tabs must not interrupt the user. | Open question 5 |
+| 2026-11-16 | Maintainer | The retry for hidden tabs must not interrupt the user. | FR-05, NFR-11 |
+| 2026-11-17 | Maintainer | Use a filler list that exists, not words that we invent. Use AI as little as possible. | FR-19, FR-20, NFR-09 |
+| 2026-11-17 | Maintainer | How can the extension and the CLI be packaged? | Section 7 |
+| 2026-11-17 | Maintainer | Should Tab Zero be a service of a larger app? | No. Section 7 |
+| 2026-11-18 | Maintainer | Start phase 1 with the regex method. | Phase 1, FR-18 to FR-23 |
+| 2026-11-18 | Maintainer | Make the page better: more useful functions and a simple, human design, not a flashy one. | Section 7, FR-21, FR-24, FR-25 |
 
 ## 9. Open questions
 
@@ -107,4 +132,4 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 2. The channel name was empty for one video. The log of the next sweep will show the cause.
 3. The button text fallback works only with an English YouTube interface. Is that sufficient?
 4. Which model gives the AI verdict in phase 2? Does it run on the computer or through an API?
-5. The FR-05 retry makes the YouTube tab active. This stops full screen in that window, for example a film in another tab. It also runs for videos that have no captions, where it cannot help. Options: find why the hidden read fails, retry only for `no-segments`, or retry only when the user clicks a button at the end of the sweep.
+5. Does SponsorBlock have data for the videos that the user watches? Each sweep file shows how many videos had SponsorBlock data. Read this number after some sweeps.
