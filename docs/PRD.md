@@ -62,8 +62,8 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | FR-21 | Each file shows the video time, the reading time and the time that SponsorBlock cut, for each video and for the sweep. The reading time uses 238 words per minute (Brysbaert, 2019). | Done (0.4.0) |
 | FR-22 | The history keeps the raw transcript. The cleanup runs when the extension saves a file, so better rules also apply to old videos. | Done (0.4.0) |
 | FR-23 | The user can turn off each cleanup step (filler removal, SponsorBlock). The page keeps the setting. | Done (0.4.0) |
-| FR-24 | After a sweep, the user can close the tabs of the videos that were read. This needs two clicks. | Planned (0.4.0) |
-| FR-25 | After a sweep, the user can show the saved file in its folder. | Planned (0.4.0) |
+| FR-24 | After a sweep, the user can close the tabs of the videos that were read. This needs two clicks. | Done (0.4.0) |
+| FR-25 | After a sweep, the user can show the saved file in its folder. | Done (0.4.0) |
 
 ## 6. Non-functional requirements
 

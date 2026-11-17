@@ -5,60 +5,87 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tab Zero</title>
   <link rel="icon" href="icons/32.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Big+Shoulders+Display:wght@600;800&display=swap" rel="stylesheet" />
+  <link rel="preload" href="fonts/figtree.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="collect.css" />
 </head>
 <body>
   <main>
-    <header class="hero">
-      <div class="count-block">
-        <h1 class="brand">Tab Zero</h1>
-        <output id="count" class="count" aria-live="polite">0</output>
-        <p id="count-label" class="count-label">Looking for YouTube tabs</p>
-      </div>
-      <div class="actions">
-        <button id="go" class="btn btn-go" type="button" disabled>Collect</button>
-        <button id="stop" class="btn btn-stop" type="button" hidden>Stop</button>
-        <button id="retry" class="btn btn-quiet" type="button" hidden>Try again with the tab shown</button>
-        <button id="split" class="btn btn-quiet" type="button" hidden>Also save as separate files</button>
-      </div>
-      <div class="progress" aria-hidden="true"><span id="bar"></span></div>
-      <p id="summary" class="summary">Uncheck a video to leave it out. Asleep tabs are woken one at a time, read, and put back to sleep.</p>
+    <header class="top">
+      <img src="icons/icon-small.svg" alt="" width="22" height="22" />
+      <span class="name">Tab Zero</span>
+      <span id="version" class="version"></span>
     </header>
 
-    <section class="list" aria-label="YouTube tabs">
-      <label class="all">
+    <section class="intro" aria-live="polite">
+      <h1 id="lede" class="lede">Looking for YouTube tabs</h1>
+      <p id="detail" class="detail"></p>
+      <figure id="ratio" class="ratio-big" hidden>
+        <span class="track"><span id="ratio-fill" class="fill"></span></span>
+        <figcaption>
+          <span><i class="key key-read"></i><span id="ratio-read"></span></span>
+          <span><i class="key key-watch"></i><span id="ratio-watch"></span></span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <div class="controls">
+      <div class="buttons">
+        <button id="go" class="btn btn-primary" type="button" disabled>Collect</button>
+        <button id="stop" class="btn btn-secondary" type="button" hidden>Stop</button>
+        <button id="show" class="btn btn-primary" type="button" hidden>Show file</button>
+        <button id="close" class="btn btn-secondary" type="button" hidden>Close read tabs</button>
+        <button id="retry" class="btn btn-quiet" type="button" hidden>Try again with the tab shown</button>
+        <button id="split" class="btn btn-quiet" type="button" hidden>Save as separate files</button>
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+      <span class="progress" aria-hidden="true"><span id="bar"></span></span>
+    </div>
+
+    <section id="list-section" class="list" aria-label="YouTube tabs">
+      <div class="all">
         <input id="all" type="checkbox" checked />
-        <span id="all-label">Select all</span>
-      </label>
+        <label for="all">Select all</label>
+        <span id="all-count" class="count"></span>
+      </div>
       <ol id="list"></ol>
     </section>
 
-    <details class="history">
+    <details class="panel">
       <summary>Cleanup</summary>
-      <div class="history-body">
-        <label><input type="checkbox" data-setting="fillers" /> Remove filler sounds, stutters and caption tags</label>
-        <label><input type="checkbox" data-setting="sponsorblock" /> Cut sponsor, intro and outro parts (using <a href="https://sponsor.ajay.app/" target="_blank" rel="noreferrer">SponsorBlock</a>)</label>
+      <div class="panel-body settings">
+        <label class="setting">
+          <input type="checkbox" data-setting="fillers" />
+          <span>
+            Remove filler sounds, stutters and caption tags
+            <small>"um", "uh", "the the", [Music]. Words like "like" and "you know" stay, because they can carry meaning.</small>
+          </span>
+        </label>
+        <label class="setting">
+          <input type="checkbox" data-setting="sponsorblock" />
+          <span>
+            Cut sponsor, self-promotion, "subscribe", intro and outro parts
+            <small>Using <a href="https://sponsor.ajay.app/" target="_blank" rel="noreferrer">SponsorBlock</a>. It gets only the first 4 characters of a hash of each video ID, never the ID.</small>
+          </span>
+        </label>
+        <p class="note">The history keeps the full transcript. These settings apply each time a file is saved.</p>
       </div>
     </details>
 
-    <details class="history">
+    <details class="panel">
       <summary id="history-title">Read in the last 30 days</summary>
-      <div class="history-body">
-        <p>A video in this list is not read again for 30 days. Its row starts unchecked; check it to take its transcript from here.</p>
-        <div class="history-actions">
-          <button id="history-save" class="btn btn-quiet" type="button">Save all as one file</button>
+      <div class="panel-body">
+        <p class="note">A video in this list is not read again for 30 days. Its row starts unchecked; check it to take its transcript from here.</p>
+        <div class="panel-actions">
+          <button id="history-save" class="btn btn-secondary" type="button">Save all as one file</button>
           <button id="history-clear" class="btn btn-quiet" type="button">Clear history</button>
         </div>
-        <ol id="history-list"></ol>
+        <ol id="history-list" class="history-list"></ol>
       </div>
     </details>
 
-    <details class="log">
+    <details class="panel">
       <summary>Log</summary>
-      <pre id="log"></pre>
+      <pre id="log" class="log"></pre>
     </details>
   </main>
   <script type="module" src="collect.js"></script>

@@ -3,7 +3,8 @@ import { openHistory, HISTORY_DAYS } from './history.js'
 import { prepare } from './clean.js'
 import { sponsorRanges } from './sponsorblock.js'
 import {
-  videoId, cleanTitle, today, sweepPath, toMarkdown, indexMarkdown, combinedMarkdown, fileName, wordCount, ago, needsView,
+  videoId, cleanTitle, today, sweepPath, toMarkdown, indexMarkdown, combinedMarkdown, fileName, wordCount, ago,
+  needsView, totals, span, clock, readSeconds, durationOf,
 } from './lib.js'
 
 const TIMEOUT = 15000
@@ -12,6 +13,12 @@ const TIMEOUT = 15000
 const ROOT = 'Tab Zero'
 const $ = (s) => document.querySelector(s)
 const self = await chrome.tabs.getCurrent()
+const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`
+const el = (tag, cls, text) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, text ? { textContent: text } : {})
+const show = (...ids) => ids.forEach((id) => ($(id).hidden = false))
+const hide = (...ids) => ids.forEach((id) => ($(id).hidden = true))
+
+$('#version').textContent = `v${chrome.runtime.getManifest().version}`
 
 // ---------- log: page, console, and the .log file saved with the sweep ----------
 
@@ -26,6 +33,7 @@ const log = (msg) => {
 const short = (tab) => `tab ${tab.id} "${cleanTitle(tab.title).slice(0, 50)}"`
 
 const history = await openHistory(chrome.storage.local)
+log(`history: ${history.all().length} videos read in the last ${HISTORY_DAYS} days${history.pruned ? `, ${history.pruned} older ones removed` : ''}`)
 
 // ---------- cleanup settings (PRD FR-23), kept in chrome.storage.local ----------
 
@@ -63,7 +71,6 @@ async function prepareAll(results) {
       : prepare(r, { fillers: settings.fillers, ranges: settings.sponsorblock ? sponsorCache.get(r.id) : undefined }),
   )
 }
-log(`history: ${history.all().length} videos read in the last ${HISTORY_DAYS} days${history.pruned ? `, ${history.pruned} older ones removed` : ''}`)
 
 // ---------- the list ----------
 
@@ -73,32 +80,29 @@ const tabs = (await chrome.tabs.query({ url: 'https://www.youtube.com/watch*' })
   const id = videoId(t.url)
   return id && !seen.has(id) && seen.add(id)
 })
+const asleepNow = (t) => t.discarded || t.status === 'unloaded'
 
-const rows = new Map() // tab.id -> { li, box, state }
+const rows = new Map() // tab.id -> { li, box, state, meta }
 for (const t of tabs) {
-  const li = document.createElement('li')
-  li.className = 'row'
-  const label = document.createElement('label')
-  const box = document.createElement('input')
+  const li = el('li', 'row')
+  const box = el('input')
   box.type = 'checkbox'
+  box.id = `pick-${t.id}`
   box.checked = true
-  const title = document.createElement('span')
-  title.className = 'title'
-  title.textContent = cleanTitle(t.title)
-  const state = document.createElement('span')
-  state.className = 'state'
-  state.textContent = t.discarded || t.status === 'unloaded' ? 'asleep' : 'awake'
+  const title = el('label', 'title', cleanTitle(t.title))
+  title.htmlFor = box.id
+  const state = el('span', 'state', asleepNow(t) ? 'asleep' : 'open')
+  const meta = el('p', 'meta')
   // Already read: unchecked by default. Checking it takes the transcript from history.
-  const seenMeta = history.meta(videoId(t.url))
-  if (seenMeta) {
+  const known = history.meta(videoId(t.url))
+  if (known) {
     box.checked = false
     li.classList.add('off')
-    state.textContent = `read ${ago(seenMeta.savedAt)}`
+    state.textContent = `read ${ago(known.savedAt)}`
   }
-  label.append(box, title, state)
-  li.append(label)
+  li.append(box, title, state, meta)
   $('#list').append(li)
-  rows.set(t.id, { li, box, state })
+  rows.set(t.id, { li, box, state, meta })
   box.onchange = () => {
     li.classList.toggle('off', !box.checked)
     syncSelection()
@@ -106,27 +110,15 @@ for (const t of tabs) {
 }
 
 const selected = () => tabs.filter((t) => rows.get(t.id).box.checked)
-
-const setCount = (n, label) => {
-  const el = $('#count')
-  if (el.textContent !== String(n)) {
-    el.textContent = n
-    el.classList.remove('tick')
-    void el.offsetWidth // restart the animation
-    el.classList.add('tick')
-  }
-  el.classList.toggle('zero', n === 0 && tabs.length > 0)
-  $('#count-label').textContent = label
-}
+const readBefore = tabs.filter((t) => history.has(videoId(t.url))).length
 
 function syncSelection() {
   const n = selected().length
   $('#all').checked = n === tabs.length
   $('#all').indeterminate = n > 0 && n < tabs.length
-  $('#all-label').textContent = `${n} of ${tabs.length} selected`
+  $('#all-count').textContent = `${n} of ${tabs.length} selected`
   $('#go').disabled = n === 0
   $('#go').textContent = n === 1 ? 'Collect 1 video' : `Collect ${n} videos`
-  setCount(n, n === 1 ? 'video to read' : 'videos to read')
 }
 
 $('#all').onchange = () => {
@@ -137,11 +129,26 @@ $('#all').onchange = () => {
   syncSelection()
 }
 
+const say = (lede, detail = '') => {
+  $('#lede').textContent = lede
+  $('#detail').textContent = detail
+}
+
 if (tabs.length === 0) {
-  setCount(0, 'No YouTube tabs open')
-  $('#summary').textContent = 'Open the videos you want to read, then open this page again.'
-  $('.list').hidden = true
-} else syncSelection()
+  say('No YouTube videos are open.', 'Open the videos you want to read, then open this page again.')
+  hide('#list-section', '#go')
+} else {
+  const asleep = tabs.filter(asleepNow).length
+  say(
+    `${plural(tabs.length, 'YouTube video')} ${tabs.length === 1 ? 'is' : 'are'} open.`,
+    [
+      readBefore ? `${readBefore === 1 ? '1 was' : `${readBefore} were`} read in the last ${HISTORY_DAYS} days, so ${readBefore === 1 ? 'it starts' : 'they start'} unchecked.` : '',
+      asleep ? `${asleep === 1 ? 'The asleep tab is' : `The ${asleep} asleep tabs are`} woken one at a time, read, and put back to sleep.` : '',
+      'No tab comes to the front while this runs.',
+    ].filter(Boolean).join(' '),
+  )
+  syncSelection()
+}
 
 const setStatus = (tab, text, cls = '') => {
   const r = rows.get(tab.id)
@@ -149,6 +156,26 @@ const setStatus = (tab, text, cls = '') => {
   r.li.classList.remove('active', 'ok', 'bad')
   if (cls) r.li.classList.add(cls)
 }
+
+// "Byte Notes · 25:00 video · [bar] 4 min to read · cut 0:40"
+function showResult(tabId, v) {
+  const r = rows.get(tabId)
+  const words = wordCount(v.segments)
+  const watch = durationOf(v)
+  const read = readSeconds(words)
+  const bar = el('span', 'ratio')
+  bar.style.setProperty('--r', watch ? Math.min(1, read / watch).toFixed(3) : 0)
+  bar.title = `${span(read)} to read, ${span(watch)} to watch`
+  r.meta.replaceChildren(
+    ...[v.channel, watch ? `${clock(watch)} video` : ''].filter(Boolean).map((t) => el('span', '', t)),
+    bar,
+    el('span', '', `${span(read)} to read`),
+    ...(v.stats?.cutSeconds ? [el('span', '', `cut ${clock(v.stats.cutSeconds)}`)] : []),
+  )
+}
+
+const shortReason = (r) =>
+  r.status === 'no-transcript' ? (r.rendered === false ? 'page did not load' : 'no captions') : r.status === 'no-segments' ? 'no lines in time' : 'error'
 
 // ---------- reading one tab ----------
 
@@ -179,7 +206,7 @@ async function collectOne(tab, inView = false) {
   // An asleep tab (Memory Saver, or restored after a restart) has no page to
   // read. Wake it, let YouTube load it as usual, read the panel, then put it
   // back to sleep. Awake tabs are left exactly as they were (no pause).
-  const asleep = tab.discarded || tab.status === 'unloaded'
+  const asleep = asleepNow(tab)
   log(`${short(tab)} start: discarded=${tab.discarded} status=${tab.status} window=${tab.windowId} url=${tab.url}`)
   if (asleep) {
     setStatus(tab, 'waking', 'active')
@@ -254,13 +281,14 @@ $('#go').onclick = async () => {
   const sweep = sweepPath() // fixed at the start, so all files of one sweep share it
   const results = []
 
-  $('#go').hidden = true
-  $('#stop').hidden = false
+  hide('#go')
+  show('#stop')
   $('#all').disabled = true
   $('#history-clear').disabled = true // clearing reloads the page, which would kill the sweep
   for (const { box } of rows.values()) box.disabled = true
   log(`sweep ${sweep} start: ${queue.length} of ${tabs.length} videos selected, extension v${chrome.runtime.getManifest().version}, timeout ${TIMEOUT}ms`)
   log(`browser: ${navigator.userAgent}`)
+  log(`cleanup: fillers=${settings.fillers} sponsorblock=${settings.sponsorblock}`)
 
   // One tab at a time on purpose: loading every YouTube page at once uses too much memory.
   for (const [i, tab] of queue.entries()) {
@@ -268,8 +296,7 @@ $('#go').onclick = async () => {
       log(`stopped by you: ${queue.length - i} videos not read`)
       break
     }
-    setCount(queue.length - i, 'left to read')
-    $('#summary').textContent = `Reading ${cleanTitle(tab.title)}`
+    $('#status').textContent = `Reading ${i + 1} of ${queue.length}: ${cleanTitle(tab.title)}`
     const id = videoId(tab.url)
     let res = await fromHistory(tab, id)
     if (!res) {
@@ -286,29 +313,86 @@ $('#go').onclick = async () => {
       // A failed save costs only a re-read next time; never lose the sweep over it.
       await history.save(v).catch((err) => log(`${short(tab)} could not save to history: ${err.message}`))
     }
-    if (v.status === 'ok') setStatus(tab, `${wordCount(v.segments).toLocaleString()} words${res.fromHistory ? ', from history' : ''}`, 'ok')
-    else setStatus(tab, v.status, 'bad')
-    $('#bar').style.setProperty('--p', `${((i + 1) / queue.length) * 100}%`)
+    if (v.status === 'ok') {
+      setStatus(tab, res.fromHistory ? 'from history' : 'done', 'ok')
+      showResult(tab.id, v)
+    } else setStatus(tab, shortReason(v), 'bad')
+    $('#bar').style.setProperty('--p', ((i + 1) / queue.length).toFixed(4))
   }
 
-  const ok = results.filter((r) => r.status === 'ok')
   const left = queue.length - results.length
   const counts = Object.entries(Object.groupBy(results, (r) => r.status)).map(([s, rs]) => `${s}=${rs.length}`)
   log(`sweep done: ${counts.join(' ') || 'nothing read'}${left ? `, ${left} not read` : ''}`)
+  hide('#stop')
 
-  $('#stop').hidden = true
   // One download for the transcripts, one for the log, saved side by side.
   // A retry saves them again under the same names.
-  const save = async (conflictAction) => {
-    await download(`${sweep}.md`, combinedMarkdown(await prepareAll(results), date), conflictAction)
+  let fileId = null
+  async function save(conflictAction) {
+    $('#status').textContent = settings.sponsorblock ? 'Asking SponsorBlock and saving' : 'Saving'
+    const ready = await prepareAll(results)
+    fileId = await download(`${sweep}.md`, combinedMarkdown(ready, date), conflictAction)
     await download(`${sweep}.log`, logLines.join('\n') + '\n', conflictAction)
+    for (const v of ready) if (v.status === 'ok') showResult(v.tabId, v) // now with the cut
+    summarize(ready)
   }
+
+  function summarize(ready) {
+    const t = totals(ready)
+    const failed = ready.length - t.ok
+    say(
+      ready.length === 0
+        ? 'Nothing was read, so nothing was saved.'
+        : `${stopping ? 'Stopped.' : 'Done.'} ${plural(t.ok, 'transcript')} saved${left ? `, ${left} not read` : ''}.`,
+      [
+        t.sponsorChecked ? `SponsorBlock cut ${span(t.cut)} from ${plural(t.sponsorFound, 'video')}.` : '',
+        t.removedWords ? `${plural(t.removedWords, 'filler word')} removed.` : '',
+        failed ? `${plural(failed, 'video')} could not be read; the file lists the reasons.` : '',
+      ].filter(Boolean).join(' '),
+    )
+    $('#status').textContent = ready.length ? `${ROOT}/${sweep}.md` : ''
+    if (t.ok && t.video) {
+      const fig = $('#ratio')
+      fig.style.setProperty('--r', Math.min(1, t.read / t.video).toFixed(4))
+      $('#ratio-read').textContent = `about ${span(t.read)} to read`
+      $('#ratio-watch').textContent = `${span(t.video)} to watch`
+      if (fig.hidden) fig.classList.add('grow') // only the first time, not after a retry
+      fig.hidden = false
+    }
+  }
+
   if (results.length) await save('uniquify')
+  else summarize([])
+
+  // Show the saved file in its folder (PRD FR-25).
+  if (fileId) {
+    show('#show')
+    $('#show').onclick = () => chrome.downloads.show(fileId)
+  }
+
+  // Close the tabs whose transcript is saved (PRD FR-24). Two clicks, no dialog.
+  const readTabs = () => results.filter((r) => r.status === 'ok').map((r) => r.tabId)
+  if (readTabs().length) {
+    show('#close')
+    $('#close').textContent = `Close ${plural(readTabs().length, 'read tab')}`
+    $('#close').onclick = twoClicks($('#close'), `Click again to close ${plural(readTabs().length, 'tab')}`, async () => {
+      const ids = readTabs()
+      await chrome.tabs.remove(ids)
+      for (const id of ids) {
+        rows.get(id).li.classList.add('gone')
+        rows.get(id).state.textContent = 'closed'
+      }
+      log(`closed ${ids.length} read tabs`)
+      hide('#close')
+    })
+  }
 
   // Retry in view, only when the user asks: it shows each tab for a few seconds.
   const retry = results.filter(needsView)
-  $('#retry').hidden = retry.length === 0
-  $('#retry').textContent = `Try ${retry.length} again with the tab shown`
+  if (retry.length) {
+    show('#retry')
+    $('#retry').textContent = `Try ${retry.length} again with the tab shown`
+  }
   $('#retry').onclick = async () => {
     $('#retry').disabled = true
     log(`retry in view requested for ${retry.length} videos`)
@@ -318,37 +402,51 @@ $('#go').onclick = async () => {
         log(`tab ${v.tabId} was closed; cannot retry "${v.title}"`)
         continue
       }
+      $('#status').textContent = `Trying again: ${cleanTitle(tab.title)}`
       const res = await collectOne(tab, true).catch((err) => ({ status: `error: ${err.message}`, segments: [] }))
       if (res.status !== 'ok') {
-        setStatus(tab, res.status, 'bad')
+        setStatus(tab, shortReason(res), 'bad')
         continue
       }
       Object.assign(v, res)
-      setStatus(tab, `${wordCount(v.segments).toLocaleString()} words`, 'ok')
+      setStatus(tab, 'done', 'ok')
       await history.save(v).catch((err) => log(`${short(tab)} could not save to history: ${err.message}`))
     }
     await save('overwrite')
-    $('#retry').hidden = true
+    hide('#retry')
     log('retry done; the sweep files were saved again')
   }
-  setCount(left, left ? (stopping ? 'left. Stopped.' : 'left to read') : 'Tab zero.')
-  const failed = results.length - ok.length
-  const reused = results.filter((r) => r.fromHistory).length
-  $('#summary').textContent = results.length
-    ? `Saved ${ok.length} transcripts to ${ROOT}/${sweep}.md${reused ? ` (${reused} from history)` : ''}.` +
-      (failed ? ` ${failed} could not be read: the reasons are under "Couldn't collect" at the top of the file, and in the log.` : '')
-    : 'Nothing was read, so nothing was saved.'
-  renderHistory()
 
   // Optional: the same content as one file per video, on request.
-  $('#split').hidden = ok.length === 0
+  if (results.some((r) => r.status === 'ok')) show('#split')
   $('#split').onclick = async () => {
     $('#split').disabled = true
     const ready = await prepareAll(results)
-    for (const v of ready.filter((r) => r.status === 'ok')) await download(`${sweep}/${fileName(v)}`, toMarkdown(v))
+    const ok = ready.filter((r) => r.status === 'ok')
+    for (const v of ok) await download(`${sweep}/${fileName(v)}`, toMarkdown(v))
     // "00-" sorts the index first. Not "_index.md": Chrome reserves names that start with "_".
     await download(`${sweep}/00-index.md`, indexMarkdown(ready, date))
-    $('#split').textContent = `Saved ${ok.length} files`
+    $('#split').textContent = `Saved ${plural(ok.length, 'file')}`
+  }
+  renderHistory()
+}
+
+// Two clicks, no modal dialog: the first click arms the button for 4 seconds.
+function twoClicks(button, armedText, action) {
+  let armed = null
+  const idle = button.textContent
+  return async () => {
+    if (!armed) {
+      button.textContent = armedText
+      armed = setTimeout(() => {
+        armed = null
+        button.textContent = idle
+      }, 4000)
+      return
+    }
+    clearTimeout(armed)
+    armed = null
+    await action()
   }
 }
 
@@ -360,13 +458,12 @@ function renderHistory() {
   $('#history-save').disabled = $('#history-clear').disabled = all.length === 0
   $('#history-list').replaceChildren(
     ...all.map((m) => {
-      const li = document.createElement('li')
-      const a = document.createElement('a')
+      const li = el('li')
+      const a = el('a', '', m.title)
       a.href = `https://www.youtube.com/watch?v=${m.id}`
       a.target = '_blank'
-      a.textContent = m.title
-      const info = document.createElement('span')
-      info.textContent = `${m.channel || 'Unknown channel'}, ${m.words.toLocaleString()} words, ${ago(m.savedAt)}`
+      a.rel = 'noreferrer'
+      const info = el('span', '', `${m.channel || 'Unknown channel'} · ${span(readSeconds(m.words))} to read · ${ago(m.savedAt)}`)
       li.append(a, info)
       return li
     }),
@@ -382,19 +479,8 @@ $('#history-save').onclick = async () => {
   log(`history saved as one file: ${results.length} videos`)
 }
 
-// Two clicks, no modal dialog: the first click arms the button for 4 seconds.
-let armed = null
-$('#history-clear').onclick = async () => {
-  if (!armed) {
-    $('#history-clear').textContent = 'Click again to clear'
-    armed = setTimeout(() => {
-      armed = null
-      $('#history-clear').textContent = 'Clear history'
-    }, 4000)
-    return
-  }
-  clearTimeout(armed)
+$('#history-clear').onclick = twoClicks($('#history-clear'), 'Click again to clear', async () => {
   await history.clear()
   log('history cleared')
   location.reload() // rows marked "read ... ago" must be redrawn
-}
+})
