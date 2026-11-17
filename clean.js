@@ -1,5 +1,29 @@
 // Phase 1 cleanup: word lists and regular expressions, one pass each, no AI model.
 // Pure: no chrome.*, no DOM, so `npm test` runs it in Node.
+import { toSeconds } from './lib.js'
+
+// Overlapping or touching ranges become one: [[0,10],[5,20],[30,40]] -> [[0,20],[30,40]].
+export function mergeRanges(ranges) {
+  const out = []
+  for (const [a, b] of [...ranges].sort((x, y) => x[0] - y[0])) {
+    const last = out.at(-1)
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b)
+    else out.push([a, b])
+  }
+  return out
+}
+
+// Drops the caption lines that start inside a cut range (ranges merged, in
+// seconds). cutSeconds is the length of the ranges, clipped to the video,
+// because SponsorBlock times can run past the end.
+export function cutSegments(segments, ranges, duration = 0) {
+  const end = duration || Infinity
+  const inCut = (t) => ranges.some(([a, b]) => t >= a && t < b)
+  return {
+    segments: segments.filter((s) => !inCut(toSeconds(s.t))),
+    cutSeconds: Math.round(ranges.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, end) - Math.max(a, 0)), 0)),
+  }
+}
 
 // Filled pauses: the English list of transcription-cleaner (MIT, Marya Dukmak,
 // github.com/mariadukmak/transcription-cleaner). Discourse markers such as
