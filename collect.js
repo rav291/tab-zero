@@ -1,7 +1,7 @@
 import { extractTranscript } from './extract.js'
 import { openHistory, HISTORY_DAYS } from './history.js'
 import {
-  videoId, cleanTitle, today, sweepPath, toMarkdown, indexMarkdown, combinedMarkdown, fileName, wordCount, ago,
+  videoId, cleanTitle, today, sweepPath, toMarkdown, indexMarkdown, combinedMarkdown, fileName, wordCount, ago, needsView,
 } from './lib.js'
 
 const TIMEOUT = 15000
@@ -136,7 +136,7 @@ const extract = async (tabId, pause) => {
   return result
 }
 
-async function collectOne(tab) {
+async function collectOne(tab, inView = false) {
   // An asleep tab (Memory Saver, or restored after a restart) has no page to
   // read. Wake it, let YouTube load it as usual, read the panel, then put it
   // back to sleep. Awake tabs are left exactly as they were (no pause).
@@ -150,26 +150,21 @@ async function collectOne(tab) {
     await ready
     log(`${short(tab)} loaded`)
   }
-  setStatus(tab, 'reading', 'active')
-  let res = await extract(tab.id, asleep)
-  log(`${short(tab)} read (hidden): ${res.status}, ${res.segments.length} segments`)
-  res.log?.forEach((l) => log(`    ${l}`))
-
-  // A hidden tab may render only the player: no description, no button, no
-  // panel. Show it for a moment, then return to this page.
-  // Known issue: this switches the active tab, which ends full screen in the
-  // window and costs ~15 s on a video that has no transcript (see PRD, section 9).
-  if (res.status !== 'ok') {
+  // The tab is never shown during a sweep (PRD NFR-11): showing it ends full
+  // screen in that window. A hidden tab that rendered only the player is
+  // offered for a retry in view after the sweep, when the user asks.
+  if (inView) {
     setStatus(tab, 'reading, tab shown', 'active')
-    log(`${short(tab)} retry with the tab visible`)
     await chrome.windows.update(tab.windowId, { focused: true })
     await chrome.tabs.update(tab.id, { active: true })
-    res = await extract(tab.id, asleep)
+  } else setStatus(tab, 'reading', 'active')
+  const res = await extract(tab.id, asleep || inView)
+  if (inView) {
     await chrome.windows.update(self.windowId, { focused: true })
     await chrome.tabs.update(self.id, { active: true })
-    log(`${short(tab)} read (visible): ${res.status}, ${res.segments.length} segments`)
-    res.log?.forEach((l) => log(`    ${l}`))
   }
+  log(`${short(tab)} read (${inView ? 'in view' : 'hidden'}): ${res.status}, ${res.segments.length} segments`)
+  res.log?.forEach((l) => log(`    ${l}`))
 
   if (asleep) {
     await chrome.tabs
@@ -183,11 +178,11 @@ async function collectOne(tab) {
 // The browser renames a file to match its MIME type: a ".log" sent as
 // text/markdown was saved as ".md" (and then "(1).md" next to the transcript).
 // octet-stream has no preferred extension, so the name is kept as given.
-const download = (path, text) =>
+const download = (path, text, conflictAction = 'uniquify') =>
   chrome.downloads.download({
     url: URL.createObjectURL(new Blob([text], { type: path.endsWith('.md') ? 'text/markdown' : 'application/octet-stream' })),
     filename: `${ROOT}/${path}`,
-    conflictAction: 'uniquify',
+    conflictAction,
     saveAs: false,
   })
 
@@ -246,7 +241,7 @@ $('#go').onclick = async () => {
         res = { status: `error: ${err.message}`, title: cleanTitle(tab.title), channel: '', duration: 0, segments: [] }
       }
     }
-    const v = { ...res, id, collected: date }
+    const v = { ...res, id, collected: date, tabId: tab.id }
     results.push(v)
     if (v.status === 'ok' && !res.fromHistory) {
       // A failed save costs only a re-read next time; never lose the sweep over it.
@@ -263,10 +258,39 @@ $('#go').onclick = async () => {
   log(`sweep done: ${counts.join(' ') || 'nothing read'}${left ? `, ${left} not read` : ''}`)
 
   $('#stop').hidden = true
-  if (results.length) {
-    // One download for the transcripts, one for the log, saved side by side.
-    await download(`${sweep}.md`, combinedMarkdown(results, date))
-    await download(`${sweep}.log`, logLines.join('\n') + '\n')
+  // One download for the transcripts, one for the log, saved side by side.
+  // A retry saves them again under the same names.
+  const save = async (conflictAction) => {
+    await download(`${sweep}.md`, combinedMarkdown(results, date), conflictAction)
+    await download(`${sweep}.log`, logLines.join('\n') + '\n', conflictAction)
+  }
+  if (results.length) await save('uniquify')
+
+  // Retry in view, only when the user asks: it shows each tab for a few seconds.
+  const retry = results.filter(needsView)
+  $('#retry').hidden = retry.length === 0
+  $('#retry').textContent = `Try ${retry.length} again with the tab shown`
+  $('#retry').onclick = async () => {
+    $('#retry').disabled = true
+    log(`retry in view requested for ${retry.length} videos`)
+    for (const v of retry) {
+      const tab = await chrome.tabs.get(v.tabId).catch(() => null)
+      if (!tab) {
+        log(`tab ${v.tabId} was closed; cannot retry "${v.title}"`)
+        continue
+      }
+      const res = await collectOne(tab, true).catch((err) => ({ status: `error: ${err.message}`, segments: [] }))
+      if (res.status !== 'ok') {
+        setStatus(tab, res.status, 'bad')
+        continue
+      }
+      Object.assign(v, res)
+      setStatus(tab, `${wordCount(v.segments).toLocaleString()} words`, 'ok')
+      await history.save(v).catch((err) => log(`${short(tab)} could not save to history: ${err.message}`))
+    }
+    await save('overwrite')
+    $('#retry').hidden = true
+    log('retry done; the sweep files were saved again')
   }
   setCount(left, left ? (stopping ? 'left. Stopped.' : 'left to read') : 'Tab zero.')
   const failed = results.length - ok.length

@@ -43,7 +43,7 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | FR-02 | When two tabs show the same video, the list shows one row. | Done |
 | FR-03 | The extension reads the transcript from the "Show transcript" panel in the real tab (the DOM). | Done |
 | FR-04 | For an asleep tab, the extension reloads the tab, pauses the video, reads the panel and discards the tab again. It does one tab at a time. | Done |
-| FR-05 | The extension does not show a tab during a sweep. If a hidden tab did not render the transcript, the extension tells the user after the sweep. The user can then click one button to try these videos again, with each tab shown for a short time. Videos that have no captions are not tried again. | Planned (0.4.0) |
+| FR-05 | The extension does not show a tab during a sweep. If a hidden tab did not render the transcript, the extension tells the user after the sweep. The user can then click one button to try these videos again, with each tab shown for a short time. Videos that have no captions are not tried again. | Done (0.4.0) |
 | FR-06 | Each sweep saves one Markdown file with all transcripts. This gives one download, not one download for each video. | Done |
 | FR-07 | After a sweep, the user can also save one file for each video, plus an index file. | Done |
 | FR-08 | Files go to `Downloads\Tab Zero\<YYYY-MM>\<YYYY-MM-DD HH-mm>.md`. The README tells how to send them to a different folder with a directory junction. | Done |

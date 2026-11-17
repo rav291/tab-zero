@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { toSeconds, clock, paragraphs, fileName, toMarkdown, indexMarkdown, videoId, combinedMarkdown, sweepPath, cleanTitle, ago } from './lib.js'
+import { toSeconds, clock, paragraphs, fileName, toMarkdown, indexMarkdown, videoId, combinedMarkdown, sweepPath, cleanTitle, ago, needsView } from './lib.js'
 
 test('time conversions', () => {
   assert.equal(toSeconds('11:09'), 669)
@@ -89,4 +89,12 @@ test('index escapes pipes and links only collected videos', () => {
   assert.match(md, /1 of 2 transcripts collected, 2 words/)
   assert.match(md, /\[a \\\| b\]\(<a b \[A\]\.md>\)/)
   assert.match(md, /\| 2 \| none \(\[yt\]/)
+})
+
+test('needsView: retry in view only when the tab may not have rendered', () => {
+  assert.equal(needsView({ status: 'no-segments' }), true)
+  assert.equal(needsView({ status: 'no-transcript', rendered: false }), true)
+  assert.equal(needsView({ status: 'no-transcript', rendered: true }), false) // no captions
+  assert.equal(needsView({ status: 'ok' }), false)
+  assert.equal(needsView({ status: 'error: tab closed' }), false)
 })

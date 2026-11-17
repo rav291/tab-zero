@@ -99,6 +99,10 @@ export const reasonFor = (status) =>
     'no-segments': 'The transcript panel opened, but no lines appeared in time.',
   })[status] || status
 
+// A hidden tab can render only the player. Showing the tab can help then,
+// but never for a video that rendered fully and has no captions.
+export const needsView = (r) => r.status === 'no-segments' || (r.status === 'no-transcript' && r.rendered === false)
+
 // results: [{ id, title, channel, status, segments }]. linkFiles: link each
 // title to its own .md file (separate files) or not (combined file).
 export function indexMarkdown(results, date, linkFiles = true) {

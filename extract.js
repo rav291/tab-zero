@@ -58,8 +58,11 @@ export async function extractTranscript(timeoutMs, pause) {
     const btn = await waitFor(findButton, timeoutMs)
     if (!btn) {
       // Tells "hidden tab rendered only the player" apart from "video has no transcript".
-      step(`no transcript button after ${timeoutMs}ms; watch-metadata=${!!document.querySelector('ytd-watch-metadata')} description-section=${!!document.querySelector('ytd-video-description-transcript-section-renderer')} visibility=${document.visibilityState}`)
-      return { status: 'no-transcript', ...meta(), segments: [], log }
+      // rendered=false: the page below the player never rendered, so a retry
+      // with the tab in view can help. rendered=true: the video has no captions.
+      const rendered = !!document.querySelector('ytd-watch-metadata')
+      step(`no transcript button after ${timeoutMs}ms; watch-metadata=${rendered} description-section=${!!document.querySelector('ytd-video-description-transcript-section-renderer')} visibility=${document.visibilityState}`)
+      return { status: 'no-transcript', rendered, ...meta(), segments: [], log }
     }
     step(`button found via ${btn.closest('ytd-video-description-transcript-section-renderer') ? 'description section' : 'text match'}: "${(btn.getAttribute('aria-label') || btn.textContent).trim().slice(0, 40)}"`)
     btn.click()
