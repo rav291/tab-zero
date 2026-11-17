@@ -57,8 +57,8 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | FR-16 | The AI verdict has four values: skip, read the summary, watch all, watch only these minutes. | Planned (phase 2) |
 | FR-17 | The AI step identifies videos that need the screen (code, diagrams, demos). For these videos, the verdict is "watch". | Planned (phase 2) |
 | FR-18 | The cleanup cuts the SponsorBlock segments of the categories `sponsor`, `selfpromo`, `interaction`, `intro` and `outro`. It does not cut `preview` or `filler`, because these can contain real content. | Planned (0.4.0) |
-| FR-19 | The cleanup removes filled pauses ("um", "uh", "hmm" and their long forms, such as "ummm") and caption tags (for example "[Music]"). It does not remove discourse markers such as "like", "you know" or "I mean", because they can carry meaning. | Planned (0.4.0) |
-| FR-20 | The cleanup removes a word that the speaker says two times in a row ("the the"). It keeps the words that English can correctly repeat, for example "that that" and "had had". | Planned (0.4.0) |
+| FR-19 | The cleanup removes filled pauses ("um", "uh", "hmm" and their long forms, such as "ummm") and caption tags (for example "[Music]"). It does not remove discourse markers such as "like", "you know" or "I mean", because they can carry meaning. | Done (0.4.0) |
+| FR-20 | The cleanup removes a word that the speaker says two times in a row ("the the"). It keeps the words that English can correctly repeat, for example "that that" and "had had". | Done (0.4.0) |
 | FR-21 | Each file shows the video time, the reading time and the time that SponsorBlock cut, for each video and for the sweep. The reading time uses 238 words per minute (Brysbaert, 2019). | Planned (0.4.0) |
 | FR-22 | The history keeps the raw transcript. The cleanup runs when the extension saves a file, so better rules also apply to old videos. | Planned (0.4.0) |
 | FR-23 | The user can turn off each cleanup step (filler removal, SponsorBlock). The page keeps the setting. | Planned (0.4.0) |
