@@ -1,6 +1,24 @@
 // Phase 1 cleanup: word lists and regular expressions, one pass each, no AI model.
 // Pure: no chrome.*, no DOM, so `npm test` runs it in Node.
-import { toSeconds } from './lib.js'
+import { toSeconds, paragraphs } from './lib.js'
+
+// One video, ready to save: SponsorBlock cuts, then one paragraph per minute,
+// then the text cleanup. Cleaning whole paragraphs also catches a stutter split
+// across two caption lines. The raw segments (kept in history) are not changed.
+// ranges: undefined = SponsorBlock off; [] = on, but no segments for this video.
+export function prepare(v, { fillers = true, ranges } = {}) {
+  const cut = ranges?.length ? cutSegments(v.segments, ranges, v.duration) : { segments: v.segments, cutSeconds: 0 }
+  let removedWords = 0
+  const segments = paragraphs(cut.segments)
+    .map(({ t, text }) => {
+      if (!fillers) return { t, text }
+      const r = cleanText(text)
+      removedWords += r.removed
+      return { t, text: r.text }
+    })
+    .filter((s) => s.text)
+  return { ...v, segments, stats: { cutSeconds: cut.cutSeconds, sponsorChecked: ranges !== undefined, removedWords } }
+}
 
 // Overlapping or touching ranges become one: [[0,10],[5,20],[30,40]] -> [[0,20],[30,40]].
 export function mergeRanges(ranges) {

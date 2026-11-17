@@ -57,7 +57,7 @@ test('combined file has the index, then one section per collected video', () => 
   assert.match(md, /^# YouTube tabs, 2026-11-13$/m)
   assert.match(md, /\| 1 \| First \(\[yt\]/) // no file link in the combined index
   assert.match(md, /^## First$/m)
-  assert.match(md, /^C · 2:05 · 2 words · https:\/\/www\.youtube\.com\/watch\?v=A$/m)
+  assert.match(md, /^C · 2:05 video · 1 s to read · 2 words · https:\/\/www\.youtube\.com\/watch\?v=A$/m)
   assert.doesNotMatch(md, /^## none$/m)
   assert.doesNotMatch(md, /^---$/m)
 })
@@ -97,4 +97,42 @@ test('needsView: retry in view only when the tab may not have rendered', () => {
   assert.equal(needsView({ status: 'no-transcript', rendered: true }), false) // no captions
   assert.equal(needsView({ status: 'ok' }), false)
   assert.equal(needsView({ status: 'error: tab closed' }), false)
+})
+
+test('reading time, spans and totals', async () => {
+  const { readSeconds, span, totals, combinedMarkdown } = await import('./lib.js')
+  assert.equal(readSeconds(238), 60)
+  assert.equal(span(45), '45 s')
+  assert.equal(span(24 * 60), '24 min')
+  assert.equal(span(65 * 60), '1 h 05 min')
+  const results = [
+    { id: 'A', title: 'a', channel: 'C', duration: 600, status: 'ok', segments: [{ t: '0:00', text: 'x y' }], stats: { cutSeconds: 90, sponsorChecked: true, removedWords: 4 } },
+    { id: 'B', title: 'b', channel: 'C', duration: 300, status: 'ok', segments: [{ t: '0:00', text: 'z' }], stats: { cutSeconds: 0, sponsorChecked: true, removedWords: 0 } },
+  ]
+  const t = totals(results)
+  assert.deepEqual([t.ok, t.video, t.cut, t.sponsorChecked, t.sponsorFound, t.removedWords], [2, 900, 90, 2, 1, 4])
+  const md = combinedMarkdown(results, '2026-11-18')
+  assert.match(md, /^15 min of video, about 1 s to read\.$/m)
+  assert.match(md, /SponsorBlock had segments for 1 of 2 videos and cut 2 min\. The cleanup removed 4 filler words\./)
+  assert.match(md, /^_SponsorBlock cut 1:30, 4 filler words removed\._$/m)
+  assert.match(md, /Uses SponsorBlock data licensed under CC BY-NC-SA 4\.0/) // attribution when something was cut
+})
+
+test('reading time, spans and totals', async () => {
+  const { readSeconds, span, totals, combinedMarkdown } = await import('./lib.js')
+  assert.equal(readSeconds(238), 60)
+  assert.equal(span(45), '45 s')
+  assert.equal(span(24 * 60), '24 min')
+  assert.equal(span(65 * 60), '1 h 05 min')
+  const results = [
+    { id: 'A', title: 'a', channel: 'C', duration: 600, status: 'ok', segments: [{ t: '0:00', text: 'x y' }], stats: { cutSeconds: 90, sponsorChecked: true, removedWords: 4 } },
+    { id: 'B', title: 'b', channel: 'C', duration: 300, status: 'ok', segments: [{ t: '0:00', text: 'z' }], stats: { cutSeconds: 0, sponsorChecked: true, removedWords: 0 } },
+  ]
+  const t = totals(results)
+  assert.deepEqual([t.ok, t.video, t.cut, t.sponsorChecked, t.sponsorFound, t.removedWords], [2, 900, 90, 2, 1, 4])
+  const md = combinedMarkdown(results, '2026-11-18')
+  assert.match(md, /^15 min of video, about 1 s to read\.$/m)
+  assert.match(md, /SponsorBlock had segments for 1 of 2 videos and cut 2 min\. The cleanup removed 4 filler words\./)
+  assert.match(md, /^_SponsorBlock cut 1:30, 4 filler words removed\._$/m)
+  assert.match(md, /Uses SponsorBlock data licensed under CC BY-NC-SA 4\.0/) // attribution when something was cut
 })

@@ -28,3 +28,24 @@ test('cleanText: leaves meaning words, real words and other scripts alone', () =
   assert.equal(clean('नमस्ते दोस्तों आज हम'), 'नमस्ते दोस्तों आज हम')
   assert.equal(clean(''), '')
 })
+
+test('prepare: cuts sponsor lines, cleans paragraphs, reports what it did', async () => {
+  const { prepare } = await import('./clean.js')
+  const v = {
+    id: 'X', title: 'T', channel: 'C', duration: 130,
+    segments: [
+      { t: '0:00', text: 'um welcome' },
+      { t: '0:20', text: 'this video is sponsored by' }, // inside the cut
+      { t: '0:40', text: 'the the topic' },
+      { t: '1:05', text: '[Music] next part' },
+    ],
+  }
+  const out = prepare(v, { ranges: [[15, 35]] })
+  assert.deepEqual(out.segments, [
+    { t: '0:00', text: 'welcome the topic' }, // "um" and one "the" removed, 0:20 cut
+    { t: '1:05', text: 'next part' },
+  ])
+  assert.deepEqual(out.stats, { cutSeconds: 20, sponsorChecked: true, removedWords: 3 })
+  assert.equal(v.segments.length, 4) // the raw transcript is not changed
+  assert.deepEqual(prepare(v, { fillers: false }).stats, { cutSeconds: 0, sponsorChecked: false, removedWords: 0 })
+})

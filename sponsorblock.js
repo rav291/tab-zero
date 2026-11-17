@@ -8,7 +8,6 @@ import { mergeRanges } from './clean.js'
 
 // Not "preview" or "filler": those can hold real content (PRD FR-18).
 export const SB_CATEGORIES = ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro']
-export const SB_ATTRIBUTION = 'Uses SponsorBlock data licensed under CC BY-NC-SA 4.0 from https://sponsor.ajay.app/.'
 const API = 'https://sponsor.ajay.app/api/skipSegments/'
 
 export async function hashPrefix(id) {

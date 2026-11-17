@@ -1,5 +1,7 @@
 import { extractTranscript } from './extract.js'
 import { openHistory, HISTORY_DAYS } from './history.js'
+import { prepare } from './clean.js'
+import { sponsorRanges } from './sponsorblock.js'
 import {
   videoId, cleanTitle, today, sweepPath, toMarkdown, indexMarkdown, combinedMarkdown, fileName, wordCount, ago, needsView,
 } from './lib.js'
@@ -24,6 +26,43 @@ const log = (msg) => {
 const short = (tab) => `tab ${tab.id} "${cleanTitle(tab.title).slice(0, 50)}"`
 
 const history = await openHistory(chrome.storage.local)
+
+// ---------- cleanup settings (PRD FR-23), kept in chrome.storage.local ----------
+
+const settings = { fillers: true, sponsorblock: true, ...(await chrome.storage.local.get('settings')).settings }
+for (const key of ['fillers', 'sponsorblock']) {
+  const box = document.querySelector(`[data-setting="${key}"]`)
+  box.checked = settings[key]
+  box.onchange = () => {
+    settings[key] = box.checked
+    chrome.storage.local.set({ settings })
+    log(`setting ${key} = ${box.checked}`)
+  }
+}
+
+// SponsorBlock answers are kept for the page's lifetime, so a retry or a
+// second save does not ask again.
+const sponsorCache = new Map()
+
+// The raw results, cleaned for a file (PRD FR-22): history keeps the raw text.
+async function prepareAll(results) {
+  const ok = results.filter((r) => r.status === 'ok')
+  if (settings.sponsorblock) {
+    const ask = ok.map((r) => r.id).filter((id) => !sponsorCache.has(id))
+    if (ask.length) {
+      const { ranges, errors } = await sponsorRanges(ask)
+      // After a failed request, cache only the videos that were found: the
+      // others may sit behind the failed prefix, so the next save asks again.
+      for (const id of ask) if (!errors.length || ranges.has(id)) sponsorCache.set(id, ranges.get(id) || [])
+      log(`SponsorBlock: segments for ${ranges.size} of ${ask.length} videos` + (errors.length ? `; ${errors.length} requests failed: ${errors.join('; ')}` : ''))
+    }
+  }
+  return results.map((r) =>
+    r.status !== 'ok'
+      ? r
+      : prepare(r, { fillers: settings.fillers, ranges: settings.sponsorblock ? sponsorCache.get(r.id) : undefined }),
+  )
+}
 log(`history: ${history.all().length} videos read in the last ${HISTORY_DAYS} days${history.pruned ? `, ${history.pruned} older ones removed` : ''}`)
 
 // ---------- the list ----------
@@ -261,7 +300,7 @@ $('#go').onclick = async () => {
   // One download for the transcripts, one for the log, saved side by side.
   // A retry saves them again under the same names.
   const save = async (conflictAction) => {
-    await download(`${sweep}.md`, combinedMarkdown(results, date), conflictAction)
+    await download(`${sweep}.md`, combinedMarkdown(await prepareAll(results), date), conflictAction)
     await download(`${sweep}.log`, logLines.join('\n') + '\n', conflictAction)
   }
   if (results.length) await save('uniquify')
@@ -305,9 +344,10 @@ $('#go').onclick = async () => {
   $('#split').hidden = ok.length === 0
   $('#split').onclick = async () => {
     $('#split').disabled = true
-    for (const v of ok) await download(`${sweep}/${fileName(v)}`, toMarkdown(v))
+    const ready = await prepareAll(results)
+    for (const v of ready.filter((r) => r.status === 'ok')) await download(`${sweep}/${fileName(v)}`, toMarkdown(v))
     // "00-" sorts the index first. Not "_index.md": Chrome reserves names that start with "_".
-    await download(`${sweep}/00-index.md`, indexMarkdown(results, date))
+    await download(`${sweep}/00-index.md`, indexMarkdown(ready, date))
     $('#split').textContent = `Saved ${ok.length} files`
   }
 }
@@ -338,7 +378,7 @@ $('#history-save').onclick = async () => {
   const all = history.all()
   const results = []
   for (const m of all) results.push({ ...m, status: 'ok', segments: (await history.load(m.id)) || [] })
-  await download(`history/${today()} last ${HISTORY_DAYS} days.md`, combinedMarkdown(results, today()))
+  await download(`history/${today()} last ${HISTORY_DAYS} days.md`, combinedMarkdown(await prepareAll(results), today()))
   log(`history saved as one file: ${results.length} videos`)
 }
 

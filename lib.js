@@ -50,40 +50,88 @@ export function fileName(v) {
   return `${safe || 'untitled'} [${v.id}].md`
 }
 
-const durationOf = (v) => v.duration || (v.segments.length ? toSeconds(v.segments.at(-1).t) : 0)
+export const durationOf = (v) => v.duration || (v.segments.length ? toSeconds(v.segments.at(-1).t) : 0)
 const body = (v) => paragraphs(v.segments).map((p) => `**[${p.t}]** ${p.text}\n`)
 
+// Average silent reading speed for English non-fiction: 238 words per minute
+// (Brysbaert, 2019, "How many words do we read per minute?").
+export const WPM = 238
+export const readSeconds = (words) => Math.round((words / WPM) * 60)
+
+// A length for people: "45 s", "24 min", "1 h 05 min".
+export const span = (sec) => {
+  if (sec < 60) return `${Math.round(sec)} s`
+  const m = Math.round(sec / 60)
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${pad(m % 60)} min`
+}
+
+export const SB_ATTRIBUTION = 'Uses SponsorBlock data licensed under CC BY-NC-SA 4.0 from https://sponsor.ajay.app/.'
+const sponsorUsed = (vs) => vs.some((v) => v.stats?.cutSeconds > 0)
+const footer = (vs) => (sponsorUsed(vs) ? ['', '---', '', SB_ATTRIBUTION, ''] : [])
+
+// "Cut 1:30 by SponsorBlock" and "removed 42 filler words", when there is something to say.
+const cleanupNote = (s) =>
+  [s?.cutSeconds ? `SponsorBlock cut ${clock(s.cutSeconds)}` : '', s?.removedWords ? `${s.removedWords} filler words removed` : '']
+    .filter(Boolean)
+    .join(', ')
+
 // One video as a section of the combined file (no front matter mid-document).
-export const toSection = (v) =>
-  [
+export const toSection = (v) => {
+  const words = wordCount(v.segments)
+  const note = cleanupNote(v.stats)
+  return [
     `## ${v.title}`,
     '',
-    `${v.channel} · ${clock(durationOf(v))} · ${wordCount(v.segments)} words · https://www.youtube.com/watch?v=${v.id}`,
+    `${v.channel} · ${clock(durationOf(v))} video · ${span(readSeconds(words))} to read · ${words} words · https://www.youtube.com/watch?v=${v.id}`,
+    ...(note ? ['', `_${note}._`] : []),
     '',
     ...body(v),
   ].join('\n')
+}
 
 // Everything in one file: one download instead of one per video.
-export const combinedMarkdown = (results, date) =>
-  [indexMarkdown(results, date, false), ...results.filter((r) => r.status === 'ok').map(toSection)].join('\n')
+export const combinedMarkdown = (results, date) => {
+  const ok = results.filter((r) => r.status === 'ok')
+  return [indexMarkdown(results, date, false), ...ok.map(toSection), ...footer(ok)].join('\n')
+}
 
-// v: { id, title, channel, duration, segments, collected }
+// v: { id, title, channel, duration, segments, collected, stats? }
 export function toMarkdown(v) {
-  const duration = durationOf(v)
+  const words = wordCount(v.segments)
   return [
     '---',
     `title: ${JSON.stringify(v.title)}`, // a JSON string is a valid YAML string
     `channel: ${JSON.stringify(v.channel)}`,
     `url: https://www.youtube.com/watch?v=${v.id}`,
-    `duration: ${clock(duration)}`,
-    `words: ${wordCount(v.segments)}`,
+    `duration: ${clock(durationOf(v))}`,
+    `words: ${words}`,
+    `read_minutes: ${Math.max(1, Math.round(readSeconds(words) / 60))}`,
+    ...(v.stats?.cutSeconds ? [`sponsorblock_cut: ${clock(v.stats.cutSeconds)}`] : []),
     `collected: ${v.collected}`,
     '---',
     '',
     `# ${v.title}`,
     '',
     ...body(v),
+    ...footer([v]),
   ].join('\n')
+}
+
+// Totals for the index and the page: video time, reading time, cut time.
+export function totals(results) {
+  const ok = results.filter((r) => r.status === 'ok')
+  const words = ok.reduce((n, r) => n + wordCount(r.segments), 0)
+  const checked = ok.filter((r) => r.stats?.sponsorChecked)
+  return {
+    ok: ok.length,
+    words,
+    video: ok.reduce((n, r) => n + durationOf(r), 0),
+    read: readSeconds(words),
+    cut: ok.reduce((n, r) => n + (r.stats?.cutSeconds || 0), 0),
+    sponsorChecked: checked.length,
+    sponsorFound: checked.filter((r) => r.stats.cutSeconds > 0).length,
+    removedWords: ok.reduce((n, r) => n + (r.stats?.removedWords || 0), 0),
+  }
 }
 
 // "today", "yesterday", "3 days ago": for the history list and row states.
@@ -107,12 +155,18 @@ export const needsView = (r) => r.status === 'no-segments' || (r.status === 'no-
 // title to its own .md file (separate files) or not (combined file).
 export function indexMarkdown(results, date, linkFiles = true) {
   const cell = (s) => s.replace(/\|/g, '\\|')
-  const ok = results.filter((r) => r.status === 'ok')
   const failed = results.filter((r) => r.status !== 'ok')
+  const t = totals(results)
+  const cleanup = [
+    t.sponsorChecked ? `SponsorBlock had segments for ${t.sponsorFound} of ${t.sponsorChecked} videos and cut ${span(t.cut)}.` : '',
+    t.removedWords ? `The cleanup removed ${t.removedWords} filler words.` : '',
+  ].filter(Boolean)
   return [
     `# YouTube tabs, ${date}`,
     '',
-    `${ok.length} of ${results.length} transcripts collected, ${ok.reduce((n, r) => n + wordCount(r.segments), 0)} words.`,
+    `${t.ok} of ${results.length} transcripts collected, ${t.words} words.`,
+    ...(t.ok ? [`${span(t.video)} of video, about ${span(t.read)} to read.`] : []),
+    ...(cleanup.length ? [cleanup.join(' ')] : []),
     '',
     ...(failed.length
       ? [
@@ -122,12 +176,17 @@ export function indexMarkdown(results, date, linkFiles = true) {
           '',
         ]
       : []),
-    '| # | Video | Channel | Words | Status |',
-    '|---|---|---|---|---|',
+    '| # | Video | Channel | Length | Read | Cut | Status |',
+    '|---|---|---|---|---|---|---|',
     ...results.map((r, i) => {
-      const video = r.status === 'ok' && linkFiles ? `[${cell(r.title)}](<${fileName(r)}>)` : cell(r.title)
-      return `| ${i + 1} | ${video} ([yt](https://www.youtube.com/watch?v=${r.id})) | ${cell(r.channel)} | ${wordCount(r.segments)} | ${r.status} |`
+      const ok = r.status === 'ok'
+      const video = ok && linkFiles ? `[${cell(r.title)}](<${fileName(r)}>)` : cell(r.title)
+      const len = ok ? clock(durationOf(r)) : ''
+      const read = ok ? span(readSeconds(wordCount(r.segments))) : ''
+      const cut = r.stats?.cutSeconds ? clock(r.stats.cutSeconds) : ''
+      return `| ${i + 1} | ${video} ([yt](https://www.youtube.com/watch?v=${r.id})) | ${cell(r.channel)} | ${len} | ${read} | ${cut} | ${r.status} |`
     }),
     '',
+    ...(linkFiles ? footer(results) : []),
   ].join('\n')
 }
