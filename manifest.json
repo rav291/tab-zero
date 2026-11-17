@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tab Zero",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Read your open YouTube tabs as text: collect every transcript into one Markdown file.",
   "permissions": ["tabs", "scripting", "downloads", "storage", "unlimitedStorage"],
   "host_permissions": ["https://www.youtube.com/*", "https://sponsor.ajay.app/*"],

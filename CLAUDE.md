@@ -10,7 +10,7 @@ See `README.md` for use and `docs/PRD.md` for scope.
 - **Every change to scope goes into `docs/PRD.md` in the same change**, written in
   ASD-STE100 Simplified Technical English: a row in section 8 (requirement log), plus a
   requirement in section 5/6 or a decision in section 7.
-- Run `npm test` before claiming anything works. It covers `lib.js` and `history.js`.
+- Run `npm test` before claiming anything works. It covers `lib.js`, `history.js`, `clean.js` and `sponsorblock.js`.
   The extension itself can't be loaded from a terminal; say so instead of claiming a
   browser test.
 - `extract.js` runs inside the YouTube tab via `chrome.scripting.executeScript`: no

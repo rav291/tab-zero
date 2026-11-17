@@ -3,7 +3,7 @@
 This document uses ASD-STE100 Simplified Technical English. Update it with each change
 to the scope. Put each change in section 8.
 
-Current version: 0.3.0 (2026-11-14).
+Current version: 0.4.0 (2026-11-18).
 
 ## 1. Purpose
 
@@ -27,7 +27,7 @@ watches them.
 | Phase | Scope | Status |
 |---|---|---|
 | 0. Collect | Read the transcripts of the open YouTube tabs into Markdown files. | Done (0.3.0) |
-| 1. Clean | Remove filler sounds, repeated words and caption tags with a word list and regular expressions. Cut sponsor, self-promotion, interaction, intro and outro segments with SponsorBlock. Show the time that the cleanup removed and the reading time. Use no AI model. | In progress (0.4.0) |
+| 1. Clean | Remove filler sounds, repeated words and caption tags with a word list and regular expressions. Cut sponsor, self-promotion, interaction, intro and outro segments with SponsorBlock. Show the time that the cleanup removed and the reading time. Use no AI model. | Done (0.4.0) |
 | 2. Judge | A Node CLI in the same repo reads the sweep files and gives a verdict for each video. Rules decide first (for example, a list of channels). An AI model decides only the videos that the rules cannot decide. The verdict compares the video with a profile that the user writes (interests and goals). | Planned |
 | 3. Prove | The user labels 30 videos. A script compares the AI verdicts with the labels and gives an agreement score. | Planned |
 | 4. Novelty | The tool tells the user when the history already contains the same ideas. | Planned |
@@ -125,6 +125,11 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | 2026-11-17 | Maintainer | Should Tab Zero be a service of a larger app? | No. Section 7 |
 | 2026-11-18 | Maintainer | Start phase 1 with the regex method. | Phase 1, FR-18 to FR-23 |
 | 2026-11-18 | Maintainer | Make the page better: more useful functions and a simple, human design, not a flashy one. | Section 7, FR-21, FR-24, FR-25 |
+| 2026-11-18 | Maintainer | Read long livestreams (1 to 3 hours). | In scope: this is the core job. First fix open question 1 (a long video failed). Proposed: split a long transcript by the YouTube chapters of the video. |
+| 2026-11-18 | Maintainer | Tab Zero for blogs (Substack, dev.to). | Not now. Blogs are text already, so only the phase 2 verdict helps. Proposed: the phase 2 CLI reads any Markdown file with front matter, and a page clipper saves the blog posts. |
+| 2026-11-18 | Maintainer | An "echo chamber" alert for many one-sided videos from the same field. | Not now. Proposed for phase 4: count the channels and topics in the history with rules. Do not let an AI judge opinions. |
+| 2026-11-18 | Maintainer | A fast decision model for genre, category and value for the goals of the user. | Phase 2: rules and a small local model first, an AI model only for the rest. Open question 6. |
+| 2026-11-18 | Maintainer | Publish on the Chrome Web Store? | Open question 7. |
 
 ## 9. Open questions
 
@@ -133,3 +138,5 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 3. The button text fallback works only with an English YouTube interface. Is that sufficient?
 4. Which model gives the AI verdict in phase 2? Does it run on the computer or through an API?
 5. Does SponsorBlock have data for the videos that the user watches? Each sweep file shows how many videos had SponsorBlock data. Read this number after some sweeps.
+6. Phase 2: which fast model sorts the videos (genre, value for the user) before any AI model? Options: keyword rules from the user profile, or a small embedding model that runs in the browser or in the CLI.
+7. Before a Chrome Web Store release: test 0.4.0 in a real browser for one week, fix open question 1, write a privacy policy, and publish as "unlisted" first.
