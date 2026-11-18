@@ -1,6 +1,7 @@
 {
   "name": "tab-zero",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "test": "node --test"

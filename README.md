@@ -116,3 +116,8 @@ Node 22+, no dependencies. The tests cover the pure logic and use made-up videos
 - Uses SponsorBlock data licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
   from https://sponsor.ajay.app/. Because of this license, Tab Zero stays free.
 - Font: [Figtree](https://github.com/erikdkennedy/figtree) (SIL Open Font License, `fonts/OFL.txt`).
+
+## License
+
+[MIT](LICENSE). The license covers the source code only. SponsorBlock data keeps its own
+license (see Credits).

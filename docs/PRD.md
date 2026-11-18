@@ -78,7 +78,7 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | NFR-07 | **Access.** Keyboard focus must be visible. The page must obey the reduced-motion setting of the system. |
 | NFR-08 | **Logs.** Each failure must be clear from the log alone. A log line gives the tab, the step and the result. |
 | NFR-09 | **Cost.** Use lists and rules before an AI model. Phase 1 uses no AI model. A cleanup step must be one pass over the text. |
-| NFR-10 | **License.** SponsorBlock data has the license CC BY-NC-SA 4.0. Tab Zero must stay free while it uses this data. The settings and each file that contains cut segments show the SponsorBlock attribution. |
+| NFR-10 | **License.** The source code has the MIT license (`LICENSE`). SponsorBlock data has the license CC BY-NC-SA 4.0. Tab Zero must stay free while it uses this data. The settings and each file that contains cut segments show the SponsorBlock attribution. |
 | NFR-11 | **Interruptions.** The extension must not change the active tab or the focused window unless the user clicks a button for that action. |
 
 ## 7. Decisions
@@ -103,6 +103,7 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | 2026-11-18 | Phase 2 starts as a Node CLI in this repo. Use Chrome Native Messaging only if one click becomes necessary. | A CLI needs no install steps and reads the sweep files that already exist. Native Messaging needs a host manifest and a registry key. |
 | 2026-11-18 | Keep Tab Zero a separate product. Other tools, for example a writing tool, connect through the Markdown files. Consider a merge only when both products have users and proof of value. | Tab Zero needs only a browser. A larger app with a database, an API and auth would give Tab Zero its blockers. |
 | 2026-11-18 | Packaging: now, a zip of the extension in GitHub Releases. Later, the Chrome Web Store. The CLI becomes an npm package with a `bin` entry. When the CLI arrives, the repo gets the folders `extension/`, `cli/` and `shared/`, with one version and one release. | Chrome on Windows does not install an extension file from outside the store. A shared folder stops copies of the same code. |
+| 2026-11-18 | Give the source code the MIT license. | Without a license, other persons cannot legally use, change or share the code. MIT is short and agrees with the MIT filler list. The license applies to the code only, not to the SponsorBlock data that the extension gets at run time. |
 
 ## 8. Requirement log
 
@@ -130,6 +131,7 @@ videos are worth the time. If the answer is good enough, stop after phase 1.
 | 2026-11-18 | Maintainer | An "echo chamber" alert for many one-sided videos from the same field. | Not now. Proposed for phase 4: count the channels and topics in the history with rules. Do not let an AI judge opinions. |
 | 2026-11-18 | Maintainer | A fast decision model for genre, category and value for the goals of the user. | Phase 2: rules and a small local model first, an AI model only for the rest. Open question 6. |
 | 2026-11-18 | Maintainer | Publish on the Chrome Web Store? | Open question 7. |
+| 2026-11-18 | Maintainer | Add a license to the public repo. | NFR-10, section 7 |
 
 ## 9. Open questions
 
